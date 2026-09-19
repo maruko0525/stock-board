@@ -1,4 +1,10 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STOCK BOARD">
+<meta name="theme-color" content="#050505">
+<link rel="apple-touch-icon" href="stock-board-icon.png">
+<link rel="icon" type="image/png" href="stock-board-icon.png">
 <title>Stock Board</title><style>
 *{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{background:#fff;padding:calc(13px + env(safe-area-inset-top)) 15px 11px;border-bottom:1px solid #ddd}h1{margin:0;font-size:19px}.sub{font-size:12px;color:#777;margin-top:3px}main{max-width:720px;margin:auto;padding:14px}.view{display:none}.view.on{display:block}.hero{font-size:23px;font-weight:850;margin:8px 2px 14px}.cards{display:grid;gap:12px}.card{border:0;background:#fff;border-radius:19px;padding:20px 17px;text-align:left;box-shadow:0 2px 10px #0000000c}.card .ico{font-size:31px}.card b{display:block;font-size:20px;margin:7px 0 4px}.card span{font-size:12px;color:#777;line-height:1.5}.bar{display:flex;align-items:center;gap:8px;margin-bottom:13px}.back,.add{border:0;border-radius:11px;padding:10px 12px;font-weight:800}.back{background:#e7e7eb}.add{background:#111;color:#fff}.title{font-size:19px;font-weight:850;flex:1}.tabs{display:flex;overflow:auto;gap:7px;margin:0 -14px 14px;padding:0 14px 3px}.tab{white-space:nowrap;border:0;border-radius:99px;padding:9px 12px;background:#e7e7eb;font-weight:750}.tab.sel{background:#111;color:#fff}.list{display:grid;gap:9px}.item{display:block;width:100%;border:0;background:#fff;border-radius:15px;padding:15px;text-align:left}.item b{font-size:16px}.meta{font-size:11px;color:#777;margin-top:4px}.pill{float:right;background:#efefff;color:#5045cf;padding:5px 8px;border-radius:99px;font-size:10px;font-weight:800}.search{display:flex;gap:7px;margin-bottom:12px}.search input{margin:0;flex:1}.search button{border:0;border-radius:11px;background:#5a4df5;color:#fff;font-weight:800;padding:0 12px}dialog{border:0;border-radius:20px;width:min(92vw,460px);padding:18px}dialog::backdrop{background:#0008}label{font-size:12px;font-weight:800;color:#555}input{width:100%;padding:12px;border:1px solid #ccc;border-radius:11px;margin:5px 0 11px;font-size:16px}.btnrow{display:flex;gap:8px}.btn{flex:1;border:0;border-radius:11px;padding:12px;font-weight:800;background:#111;color:#fff}.ghost{background:#eee;color:#111}.ysearch{display:block;text-decoration:none;text-align:center;background:#efedff;color:#493fc4;padding:11px;border-radius:11px;font-weight:800;margin-bottom:10px}.hint{font-size:11px;color:#777;line-height:1.5}.manage{border-top:1px solid #eee;margin-top:13px;padding-top:10px}.mi{display:flex;gap:5px;align-items:center;padding:6px 0}.mi span{flex:1;font-size:12px}.mini{border:0;border-radius:7px;padding:6px}.danger{background:#fee;color:#a00}
 
@@ -16,7 +22,7 @@
 </style></head><body>
 <header><h1>📈 STOCK BOARD</h1><div class="sub">カテゴリー → 見たい情報 → 銘柄</div></header><main>
 <section id="home" class="view on"><div class="hero">まずカテゴリーを選ぶ</div>
-<div class="favtop"><button class="favbtn" onclick="openTour()">⭐ お気に入り巡回</button></div><div class="cards">
+<div class="favtop"><button class="favbtn" onclick="openTour()">⭐ お気に入り巡回</button></div><div class="favtop"><button class="favbtn" style="background:#e9e9ee;color:#111" onclick="openData()">💾 データ保存・復元</button></div><div class="cards">
 <button class="card" onclick="enter('fund')"><div class="ico">🌏</div><b>投資信託</b><span>オルカン・S&P500・FANG+など、登録した投信だけ表示</span></button>
 <button class="card" onclick="enter('stock')"><div class="ico">🏢</div><b>株式</b><span>三菱重工・フジクラ・銀行・半導体など、登録した株式だけ表示</span></button>
 <button class="card" onclick="enter('market')"><div class="ico">🌐</div><b>主要マーケット</b><span>日経平均・NYダウ・米ドル/円・TOPIX・NASDAQ・S&P 500</span></button>
@@ -38,6 +44,10 @@
   </div>
   <div id="tourList"></div>
 </div>
+</section><section id="dataView" class="view">
+<div class="bar"><button class="back" onclick="dataHome()">←</button><div class="title">💾 データ保存・復元</div></div>
+<div class="card"><b>バックアップ</b><p class="sub">登録銘柄・巡回パターン・順番・秒数・メモをまとめて保存します。</p><button class="favbtn" onclick="downloadBackup()">バックアップを書き出す</button></div>
+<div class="card"><b>復元</b><p class="sub">以前書き出したJSONファイルから復元します。</p><input id="restoreFile" type="file" accept=".json,application/json" style="width:100%;margin:10px 0"><button class="favbtn" style="background:#5b4df7" onclick="restoreBackup()">復元する</button></div>
 </section></main>
 <dialog id="dlg"><h3 style="margin-top:0">検索・追加</h3><label>Yahoo!ファイナンスのコード</label><input id="code" placeholder="例 7011 / 0331418A"><label>表示名</label><input id="nm" placeholder="例 三菱重工 / オルカン"><a id="ys" class="ysearch" target="_blank" rel="noopener" href="https://finance.yahoo.co.jp/search/">🔎 Yahoo!ファイナンスで名前検索 ↗</a><div class="hint">名前からYahoo!ファイナンスで探し、表示されたコードを登録できます。日本株4桁は「.T」を自動付与します。</div><div class="btnrow"><button class="btn ghost" onclick="dlg.close()">閉じる</button><button class="btn" onclick="saveNew()">追加</button></div><div class="manage"><b>このカテゴリーの登録済み</b><div id="manage"></div></div></dialog>
 <script>
@@ -128,7 +138,8 @@ function renderTour(){
  const p=currentPattern();if(!p)return;
  document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><label class="mini">⏱ <select onchange="setItemSec(${i},this.value)">${secOptions(f.seconds||p.seconds||10)}</select></label><button class="danger" onclick="removeFav(${i})">削除</button></div><textarea class="memo" placeholder="📝 巡回メモ" oninput="setMemo(${i},this.value)">${esc(f.memo||'')}</textarea></div>`).join(''):'<div class="card">このパターンにはまだ項目がありません。銘柄画面の ☆ から登録できます。</div>';
 }
-function secOptions(v){let s='';for(let n=2;n<=60;n++)s+=`<option value="${n}" ${n==v?'selected':''}>${n}秒</option>`;return s}
+function timeChoices(){const a=[0.5,1,1.5];for(let n=2;n<=60;n++)a.push(n);return a}
+function secOptions(v){return timeChoices().map(n=>`<option value="${n}" ${Number(n)===Number(v)?'selected':''}>${n}秒</option>`).join('')}
 function setItemSec(i,v){const p=currentPattern();p.items[i].seconds=Number(v);savePatterns()}
 function setMemo(i,v){const p=currentPattern();p.items[i].memo=v;savePatterns()}
 function moveFav(i,d){const p=currentPattern(),j=i+d;if(j<0||j>=p.items.length)return;[p.items[i],p.items[j]]=[p.items[j],p.items[i]];savePatterns();renderTour()}
@@ -149,7 +160,23 @@ function scheduleTour(){
 }
 function stopTour(closeWin=true){tourRunning=false;if(tourTimer)clearTimeout(tourTimer);tourTimer=null;if(closeWin&&tourWin&&!tourWin.closed)tourWin.close()}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-const secSel=document.querySelector('#tourSec');for(let s=2;s<=60;s++){const o=document.createElement('option');o.value=s;o.textContent=s+'秒';secSel.appendChild(o)}
+const secSel=document.querySelector('#tourSec');timeChoices().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s+'秒';secSel.appendChild(o)})
+
+
+function openData(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.querySelector('#dataView').classList.add('on')}
+function dataHome(){document.querySelector('#dataView').classList.remove('on');document.querySelector('#home').classList.add('on')}
+function backupObject(){return {app:'STOCK BOARD',formatVersion:1,exportedAt:new Date().toISOString(),assets:saved,patterns:patterns}}
+function downloadBackup(){
+ const blob=new Blob([JSON.stringify(backupObject(),null,2)],{type:'application/json'}),a=document.createElement('a'),d=new Date(),pad=n=>String(n).padStart(2,'0');
+ a.href=URL.createObjectURL(blob);a.download=`stock-board-backup-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;document.body.appendChild(a);a.click();a.remove();
+}
+async function restoreBackup(){
+ const f=document.querySelector('#restoreFile').files[0];if(!f){alert('バックアップファイルを選んでください');return}
+ try{const data=JSON.parse(await f.text());if(data.app!=='STOCK BOARD'||!Array.isArray(data.assets)||!Array.isArray(data.patterns))throw 0;
+ if(!confirm('現在の登録内容をバックアップの内容に置き換えますか？'))return;
+ saved=data.assets;patterns=data.patterns;persist();savePatterns();alert('復元しました');dataHome()}
+ catch(e){alert('STOCK BOARDのバックアップファイルを読み込めませんでした')}
+}
 
 persist();
 </script></body></html>
