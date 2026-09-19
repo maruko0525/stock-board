@@ -39,8 +39,8 @@
 <div id="patternEdit" style="display:none">
   <div class="card">
     <input id="patternName" placeholder="巡回パターン名（例：朝チェック）" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px">
-    <div class="tourrow"><b>基本表示時間</b><select id="tourSec"></select><button class="add" onclick="savePattern()">保存</button></div>
-    <div class="sub">各項目の秒数は個別にも変更できます。巡回中に残したメモは次回も表示されます。</div>
+    <div class="tourrow"><b>基本表示時間</b><select id="tourSec"></select><button class="add" onclick="applyBasicTime()">全項目に適用</button><button class="add" onclick="savePattern()">保存</button></div>
+    <div class="sub">「全項目に適用」で0.5秒〜60秒をまとめて変更できます。メモは各項目の「📝 メモを開く」から編集できます。巡回終了はYahoo側のタブを閉じるとSTOCK BOARDへ戻ります。</div>
   </div>
   <div id="tourList"></div>
 </div>
@@ -48,7 +48,8 @@
 <div class="bar"><button class="back" onclick="dataHome()">←</button><div class="title">💾 データ保存・復元</div></div>
 <div class="card"><b>旧バージョン救出</b>
 <p class="sub">Safariに残っている旧STOCK BOARDの保存領域を再検索します。</p>
-<button class="favbtn" style="background:#1769ff" onclick="manualRescue()">旧データを再検索</button></div>
+<button class="favbtn" style="background:#1769ff" onclick="manualRescue()">旧データを再検索</button>
+<div id="rescueReport" class="sub" style="margin-top:10px"></div></div>
 <div class="card"><b>バックアップ</b><p class="sub">登録銘柄・巡回パターン・順番・秒数・メモをまとめて保存します。</p><button class="favbtn" onclick="downloadBackup()">バックアップを書き出す</button></div>
 <div class="card"><b>復元</b><p class="sub">以前書き出したJSONファイルから復元します。</p><input id="restoreFile" type="file" accept=".json,application/json" style="width:100%;margin:10px 0"><button class="favbtn" style="background:#5b4df7" onclick="restoreBackup()">復元する</button></div>
 </section></main>
@@ -108,18 +109,31 @@ function recoverLegacyAssets(){
   });
   return found;
 }
+function normalizeLegacyItem(x,p){
+ if(!x||!x.code)return null;
+ const inf=x.info||x.kind||x.tab||'detail';
+ return {code:x.code,name:x.name||x.code,type:x.type||'stock',info:inf,
+   infoName:x.infoName||x.label||inf,seconds:Number(x.seconds||p?.seconds||10),memo:x.memo||''};
+}
 function recoverLegacyPatterns(){
-  const out=[];
-  ['stockBoardV6Patterns','stockBoardV7Patterns'].forEach(k=>{
-    const d=safeJSON(k);
-    if(Array.isArray(d)) d.forEach(p=>out.push(p));
-  });
-  const fav=safeJSON('stockBoardV5Favorites');
-  if(Array.isArray(fav)&&fav.length&&!out.length){
-    out.push({id:Date.now(),name:'復旧したお気に入り巡回',seconds:10,
-      items:fav.map(x=>({...x,seconds:x.seconds||10,memo:x.memo||''}))});
-  }
-  return out;
+ const out=[], seen=new Set();
+ const addPattern=p=>{
+   if(!p)return;
+   let raw=Array.isArray(p.items)?p.items:(Array.isArray(p.favorites)?p.favorites:[]);
+   const items=raw.map(x=>normalizeLegacyItem(x,p)).filter(Boolean);
+   if(!items.length)return;
+   const sig=(p.name||'')+'|'+items.map(x=>x.code+'|'+x.info).join('>');
+   if(seen.has(sig))return; seen.add(sig);
+   out.push({id:p.id||Date.now()+out.length,name:p.name||'復旧した巡回',seconds:Number(p.seconds||10),items});
+ };
+ ['stockBoardV6Patterns','stockBoardV7Patterns','stockBoardPatterns','stockBoardV5Patterns'].forEach(k=>{
+   const d=safeJSON(k); if(Array.isArray(d))d.forEach(addPattern);
+ });
+ ['stockBoardV5Favorites','stockBoardFavorites'].forEach(k=>{
+   const fav=safeJSON(k);
+   if(Array.isArray(fav)&&fav.length) addPattern({name:'復旧したお気に入り巡回',seconds:10,items:fav});
+ });
+ return out;
 }
 // Rescue old registered assets if the current saved list is empty/default-like.
 const rescuedAssets=recoverLegacyAssets();
@@ -173,7 +187,8 @@ function savePattern(){
 function deletePattern(id){if(!confirm('この巡回パターンを削除しますか？'))return;patterns=patterns.filter(p=>p.id!==id);savePatterns();showPatterns()}
 function renderTour(){
  const p=currentPattern();if(!p)return;
- document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><label class="mini">⏱ <select onchange="setItemSec(${i},this.value)">${secOptions(f.seconds||p.seconds||10)}</select></label><button class="danger" onclick="removeFav(${i})">削除</button></div><textarea class="memo" placeholder="📝 巡回メモ" oninput="setMemo(${i},this.value)">${esc(f.memo||'')}</textarea></div>`).join(''):'<div class="card">このパターンにはまだ項目がありません。銘柄画面の ☆ から登録できます。</div>';
+ document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><label class="mini">⏱ <select onchange="setItemSec(${i},this.value)">${secOptions(f.seconds||p.seconds||10)}</select></label><button class="danger" onclick="removeFav(${i})">削除</button></div><button class="mini" style="margin-top:8px" onclick="toggleMemo(${i})">📝 メモを開く</button>
+<textarea id="memo-${i}" class="memo" style="display:none" placeholder="この項目の巡回メモ" oninput="setMemo(${i},this.value)">${esc(f.memo||'')}</textarea></div>`).join(''):'<div class="card">このパターンにはまだ項目がありません。銘柄画面の ☆ から登録できます。</div>';
 }
 function timeChoices(){const a=[0.5,1,1.5];for(let n=2;n<=60;n++)a.push(n);return a}
 function secOptions(v){return timeChoices().map(n=>`<option value="${n}" ${Number(n)===Number(v)?'selected':''}>${n}秒</option>`).join('')}
@@ -201,20 +216,35 @@ const secSel=document.querySelector('#tourSec');timeChoices().forEach(s=>{const 
 
 
 
-function manualRescue(){
- const a=recoverLegacyAssets(), ps=recoverLegacyPatterns();
- let added=0;
- a.forEach(x=>{if(!saved.some(y=>y.code===x.code)){saved.push(x);added++}});
- if(ps.length){
-   ps.forEach(p=>{
-     const sig=(p.name||'')+'|'+JSON.stringify(p.items||[]);
-     if(!patterns.some(q=>((q.name||'')+'|'+JSON.stringify(q.items||[]))===sig))patterns.push(p);
-   });
- }
- persist();savePatterns();
- alert(`再検索完了：旧銘柄 ${a.length}件（新規復旧 ${added}件）／旧巡回パターン ${ps.length}件`);
+
+function applyBasicTime(){
+ const p=currentPattern();if(!p)return;
+ const v=Number(document.querySelector('#tourSec').value);
+ p.seconds=v;p.items.forEach(x=>x.seconds=v);savePatterns();renderTour();
+ alert(v+'秒を全項目に適用しました');
+}
+function toggleMemo(i){
+ const el=document.getElementById('memo-'+i);if(!el)return;
+ el.style.display=el.style.display==='none'?'block':'none';
+ if(el.style.display==='block')el.focus();
 }
 
+function manualRescue(){
+ const assets=recoverLegacyAssets(), ps=recoverLegacyPatterns();
+ let assetAdded=0, patternAdded=0, itemCount=0;
+ assets.forEach(x=>{if(!saved.some(y=>y.code===x.code)){saved.push(x);assetAdded++}});
+ ps.forEach(p=>{
+   itemCount+=p.items.length;
+   const sig=(p.name||'')+'|'+p.items.map(x=>x.code+'|'+x.info).join('>');
+   const exists=patterns.some(q=>((q.name||'')+'|'+(q.items||[]).map(x=>x.code+'|'+x.info).join('>'))===sig);
+   if(!exists){patterns.push(p);patternAdded++}
+ });
+ persist();savePatterns();
+ const msg=`検出：旧銘柄 ${assets.length}件／巡回項目 ${itemCount}件／巡回パターン ${ps.length}件\n今回追加：銘柄 ${assetAdded}件／パターン ${patternAdded}件`;
+ const r=document.getElementById('rescueReport');if(r)r.innerText=msg;
+ alert(msg);
+ showPatterns();
+}
 function openData(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.querySelector('#dataView').classList.add('on')}
 function dataHome(){document.querySelector('#dataView').classList.remove('on');document.querySelector('#home').classList.add('on')}
 function backupObject(){return {app:'STOCK BOARD',formatVersion:1,exportedAt:new Date().toISOString(),assets:saved,patterns:patterns}}
