@@ -7,6 +7,12 @@
 .tourrow{display:flex;gap:8px;align-items:center;margin:10px 0}.tourrow select{padding:10px;border:0;border-radius:10px;background:#eee;font-weight:800}
 .touritem{background:#fff;border-radius:14px;padding:13px;margin:8px 0}.touritem b{font-size:14px}.tourmeta{font-size:11px;color:#777;margin-top:4px}
 .touractions{display:flex;gap:6px;margin-top:8px}.touractions button{border:0;border-radius:8px;padding:7px 9px;font-weight:800}
+
+.pattern{background:#fff;border-radius:16px;padding:14px;margin:9px 0}
+.patternHead{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.patternBtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.patternBtns button,.mini{border:0;border-radius:9px;padding:8px 10px;font-weight:800}
+.memo{width:100%;min-height:64px;border:1px solid #ddd;border-radius:10px;padding:9px;margin-top:8px;font:inherit}
 </style></head><body>
 <header><h1>📈 STOCK BOARD</h1><div class="sub">カテゴリー → 見たい情報 → 銘柄</div></header><main>
 <section id="home" class="view on"><div class="hero">まずカテゴリーを選ぶ</div>
@@ -22,10 +28,16 @@
 <div class="search"><input id="filter" placeholder="このカテゴリー内を検索" oninput="renderAssets()"><button onclick="addOpen()">検索・追加</button></div>
 <div id="assets" class="list"></div></section>
 <section id="tour" class="view">
-<div class="bar"><button class="back" onclick="tourHome()">←</button><div class="title">⭐ お気に入り巡回</div></div>
-<div class="tourrow"><b>表示時間</b><select id="tourSec"></select><button class="add" onclick="startTour()">▶ 自動巡回</button></div>
-<div class="sub" style="margin-bottom:10px">登録順に、投信・株式・主要マーケットをまたいで巡回します。Yahooのタブを閉じると終了します。</div>
-<div id="tourList"></div>
+<div class="bar"><button class="back" onclick="tourHome()">←</button><div class="title">⭐ 巡回パターン</div><button class="add" onclick="newPattern()">＋新規</button></div>
+<div id="patternList"></div>
+<div id="patternEdit" style="display:none">
+  <div class="card">
+    <input id="patternName" placeholder="巡回パターン名（例：朝チェック）" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px">
+    <div class="tourrow"><b>基本表示時間</b><select id="tourSec"></select><button class="add" onclick="savePattern()">保存</button></div>
+    <div class="sub">各項目の秒数は個別にも変更できます。巡回中に残したメモは次回も表示されます。</div>
+  </div>
+  <div id="tourList"></div>
+</div>
 </section></main>
 <dialog id="dlg"><h3 style="margin-top:0">検索・追加</h3><label>Yahoo!ファイナンスのコード</label><input id="code" placeholder="例 7011 / 0331418A"><label>表示名</label><input id="nm" placeholder="例 三菱重工 / オルカン"><a id="ys" class="ysearch" target="_blank" rel="noopener" href="https://finance.yahoo.co.jp/search/">🔎 Yahoo!ファイナンスで名前検索 ↗</a><div class="hint">名前からYahoo!ファイナンスで探し、表示されたコードを登録できます。日本株4桁は「.T」を自動付与します。</div><div class="btnrow"><button class="btn ghost" onclick="dlg.close()">閉じる</button><button class="btn" onclick="saveNew()">追加</button></div><div class="manage"><b>このカテゴリーの登録済み</b><div id="manage"></div></div></dialog>
 <script>
@@ -70,54 +82,74 @@ function saveNew(){let code=document.querySelector('#code').value.trim(),name=do
 document.querySelector('#nm').addEventListener('input',e=>document.querySelector('#ys').href='https://finance.yahoo.co.jp/search/?query='+encodeURIComponent(e.target.value.trim()));
 
 const FAVKEY='stockBoardV5Favorites';
-let favorites=JSON.parse(localStorage.getItem(FAVKEY)||'[]');
-let tourWin=null,tourTimer=null,tourIndex=0,tourRunning=false;
+const PATKEY='stockBoardV6Patterns';
+let legacyFavs=JSON.parse(localStorage.getItem(FAVKEY)||'[]');
+let patterns=JSON.parse(localStorage.getItem(PATKEY)||'null');
+if(!patterns){
+  patterns=legacyFavs.length?[{id:Date.now(),name:'お気に入り巡回',seconds:10,items:legacyFavs.map(x=>({...x,seconds:10,memo:''}))}]:[];
+  localStorage.setItem(PATKEY,JSON.stringify(patterns));
+}
+let editPatternId=null,tourWin=null,tourTimer=null,tourIndex=0,tourRunning=false;
 
 function assetByCode(code){return [...saved,...markets].find(x=>x.code===code)}
+function currentPattern(){return patterns.find(p=>p.id===editPatternId)}
+function savePatterns(){localStorage.setItem(PATKEY,JSON.stringify(patterns))}
 function addFavorite(code){
  const a=assetByCode(code); if(!a)return;
- favorites.push({code:a.code,name:a.name,type:a.type,info,infoName:infoLabel()});
- localStorage.setItem(FAVKEY,JSON.stringify(favorites));
- alert('⭐ '+a.name+'｜'+infoLabel()+' を巡回に登録しました');
+ if(!patterns.length){patterns.push({id:Date.now(),name:'お気に入り巡回',seconds:10,items:[]})}
+ const p=patterns[0];
+ p.items.push({code:a.code,name:a.name,type:a.type,info,infoName:infoLabel(),seconds:p.seconds||10,memo:''});
+ savePatterns();
+ alert('⭐ '+a.name+'｜'+infoLabel()+' を「'+p.name+'」に登録しました');
 }
 function openTour(){
  document.querySelector('#home').classList.remove('on');document.querySelector('#cat').classList.remove('on');
- document.querySelector('#tour').classList.add('on');renderTour();
+ document.querySelector('#tour').classList.add('on');showPatterns();
 }
-function tourHome(){
- stopTour(false);document.querySelector('#tour').classList.remove('on');document.querySelector('#home').classList.add('on');
+function tourHome(){stopTour(false);document.querySelector('#tour').classList.remove('on');document.querySelector('#home').classList.add('on')}
+function showPatterns(){
+ document.querySelector('#patternEdit').style.display='none';
+ document.querySelector('#patternList').style.display='block';
+ document.querySelector('#patternList').innerHTML=patterns.length?patterns.map(p=>`<div class="pattern"><div class="patternHead"><b>${esc(p.name)}</b><span>${p.items.length}件・基本${p.seconds||10}秒</span></div><div class="patternBtns"><button onclick="editPattern(${p.id})">編集</button><button onclick="runPattern(${p.id})">▶ 自動巡回</button><button class="danger" onclick="deletePattern(${p.id})">削除</button></div></div>`).join(''):'<div class="card">まだ巡回パターンがありません。「＋新規」で作成してください。</div>';
 }
+function newPattern(){
+ const id=Date.now();patterns.push({id,name:'新しい巡回',seconds:10,items:[]});savePatterns();editPattern(id);
+}
+function editPattern(id){
+ editPatternId=id;const p=currentPattern();if(!p)return;
+ document.querySelector('#patternList').style.display='none';document.querySelector('#patternEdit').style.display='block';
+ document.querySelector('#patternName').value=p.name;document.querySelector('#tourSec').value=p.seconds||10;renderTour();
+}
+function savePattern(){
+ const p=currentPattern();if(!p)return;p.name=document.querySelector('#patternName').value.trim()||'巡回パターン';p.seconds=Number(document.querySelector('#tourSec').value);savePatterns();showPatterns();
+}
+function deletePattern(id){if(!confirm('この巡回パターンを削除しますか？'))return;patterns=patterns.filter(p=>p.id!==id);savePatterns();showPatterns()}
 function renderTour(){
- document.querySelector('#tourList').innerHTML=favorites.length?favorites.map((f,i)=>`<div class="touritem"><b>${i+1}. ${f.name}｜${f.infoName}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${f.code}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><button class="danger" onclick="removeFav(${i})">削除</button></div></div>`).join(''):'<div class="card">まだ登録がありません。各カテゴリーで「見たい情報」を選び、銘柄右上の ☆ を押してください。</div>';
+ const p=currentPattern();if(!p)return;
+ document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><label class="mini">⏱ <select onchange="setItemSec(${i},this.value)">${secOptions(f.seconds||p.seconds||10)}</select></label><button class="danger" onclick="removeFav(${i})">削除</button></div><textarea class="memo" placeholder="📝 巡回メモ" oninput="setMemo(${i},this.value)">${esc(f.memo||'')}</textarea></div>`).join(''):'<div class="card">このパターンにはまだ項目がありません。銘柄画面の ☆ から登録できます。</div>';
 }
-function moveFav(i,d){const j=i+d;if(j<0||j>=favorites.length)return;[favorites[i],favorites[j]]=[favorites[j],favorites[i]];saveFav();renderTour()}
-function removeFav(i){favorites.splice(i,1);saveFav();renderTour()}
-function saveFav(){localStorage.setItem(FAVKEY,JSON.stringify(favorites))}
+function secOptions(v){let s='';for(let n=2;n<=60;n++)s+=`<option value="${n}" ${n==v?'selected':''}>${n}秒</option>`;return s}
+function setItemSec(i,v){const p=currentPattern();p.items[i].seconds=Number(v);savePatterns()}
+function setMemo(i,v){const p=currentPattern();p.items[i].memo=v;savePatterns()}
+function moveFav(i,d){const p=currentPattern(),j=i+d;if(j<0||j>=p.items.length)return;[p.items[i],p.items[j]]=[p.items[j],p.items[i]];savePatterns();renderTour()}
+function removeFav(i){const p=currentPattern();p.items.splice(i,1);savePatterns();renderTour()}
 function favUrl(f){return 'https://finance.yahoo.co.jp/quote/'+encodeURIComponent(f.code)+suffix(f.info)}
+function runPattern(id){editPatternId=id;startTour()}
 function startTour(){
- if(!favorites.length){alert('巡回するお気に入りを登録してください');return}
- stopTour(false);tourIndex=0;tourRunning=true;
- tourWin=window.open(favUrl(favorites[0]),'stockBoardYahoo');
+ const p=currentPattern();if(!p||!p.items.length){alert('巡回項目がありません');return}
+ stopTour(false);tourIndex=0;tourRunning=true;tourWin=window.open(favUrl(p.items[0]),'stockBoardYahoo');
  if(!tourWin){tourRunning=false;alert('Yahoo画面を開けませんでした');return}
  scheduleTour();
 }
 function scheduleTour(){
- if(!tourRunning)return;
- const ms=Number(document.querySelector('#tourSec').value)*1000;
- tourTimer=setTimeout(()=>{
-   if(!tourRunning)return;
-   if(!tourWin||tourWin.closed){stopTour(false);return}
-   tourIndex=(tourIndex+1)%favorites.length;
-   try{tourWin.location.href=favUrl(favorites[tourIndex])}catch(e){stopTour(false);return}
-   scheduleTour();
- },ms);
+ if(!tourRunning)return;const p=currentPattern(),item=p.items[tourIndex];
+ const ms=Number(item.seconds||p.seconds||10)*1000;
+ tourTimer=setTimeout(()=>{if(!tourRunning)return;if(!tourWin||tourWin.closed){stopTour(false);return}
+ tourIndex=(tourIndex+1)%p.items.length;try{tourWin.location.href=favUrl(p.items[tourIndex])}catch(e){stopTour(false);return}scheduleTour()},ms);
 }
-function stopTour(closeWin=true){
- tourRunning=false;if(tourTimer)clearTimeout(tourTimer);tourTimer=null;
- if(closeWin&&tourWin&&!tourWin.closed)tourWin.close();
-}
-const secSel=document.querySelector('#tourSec');
-for(let s=2;s<=60;s++){const o=document.createElement('option');o.value=s;o.textContent=s+'秒';if(s===10)o.selected=true;secSel.appendChild(o)}
+function stopTour(closeWin=true){tourRunning=false;if(tourTimer)clearTimeout(tourTimer);tourTimer=null;if(closeWin&&tourWin&&!tourWin.closed)tourWin.close()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const secSel=document.querySelector('#tourSec');for(let s=2;s<=60;s++){const o=document.createElement('option');o.value=s;o.textContent=s+'秒';secSel.appendChild(o)}
 
 persist();
 </script></body></html>
