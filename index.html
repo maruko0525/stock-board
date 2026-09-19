@@ -46,6 +46,9 @@
 </div>
 </section><section id="dataView" class="view">
 <div class="bar"><button class="back" onclick="dataHome()">←</button><div class="title">💾 データ保存・復元</div></div>
+<div class="card"><b>旧バージョン救出</b>
+<p class="sub">Safariに残っている旧STOCK BOARDの保存領域を再検索します。</p>
+<button class="favbtn" style="background:#1769ff" onclick="manualRescue()">旧データを再検索</button></div>
 <div class="card"><b>バックアップ</b><p class="sub">登録銘柄・巡回パターン・順番・秒数・メモをまとめて保存します。</p><button class="favbtn" onclick="downloadBackup()">バックアップを書き出す</button></div>
 <div class="card"><b>復元</b><p class="sub">以前書き出したJSONファイルから復元します。</p><input id="restoreFile" type="file" accept=".json,application/json" style="width:100%;margin:10px 0"><button class="favbtn" style="background:#5b4df7" onclick="restoreBackup()">復元する</button></div>
 </section></main>
@@ -93,10 +96,44 @@ document.querySelector('#nm').addEventListener('input',e=>document.querySelector
 
 const FAVKEY='stockBoardV5Favorites';
 const PATKEY='stockBoardV6Patterns';
+
+function safeJSON(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}
+function recoverLegacyAssets(){
+  const keys=['stockBoardV2','stockBoardV3','stockBoardV4','stockBoardV5','stockBoardV6','stockBoardV7'];
+  const found=[];
+  keys.forEach(k=>{
+    const d=safeJSON(k);
+    const arr=Array.isArray(d)?d:(d&&Array.isArray(d.assets)?d.assets:[]);
+    arr.forEach(x=>{if(x&&x.code&&!found.some(y=>y.code===x.code))found.push(x)})
+  });
+  return found;
+}
+function recoverLegacyPatterns(){
+  const out=[];
+  ['stockBoardV6Patterns','stockBoardV7Patterns'].forEach(k=>{
+    const d=safeJSON(k);
+    if(Array.isArray(d)) d.forEach(p=>out.push(p));
+  });
+  const fav=safeJSON('stockBoardV5Favorites');
+  if(Array.isArray(fav)&&fav.length&&!out.length){
+    out.push({id:Date.now(),name:'復旧したお気に入り巡回',seconds:10,
+      items:fav.map(x=>({...x,seconds:x.seconds||10,memo:x.memo||''}))});
+  }
+  return out;
+}
+// Rescue old registered assets if the current saved list is empty/default-like.
+const rescuedAssets=recoverLegacyAssets();
+if(rescuedAssets.length){
+  rescuedAssets.forEach(x=>{if(!saved.some(y=>y.code===x.code))saved.push(x)});
+  localStorage.setItem(KEY,JSON.stringify(saved));
+}
+
 let legacyFavs=JSON.parse(localStorage.getItem(FAVKEY)||'[]');
-let patterns=JSON.parse(localStorage.getItem(PATKEY)||'null');
-if(!patterns){
-  patterns=legacyFavs.length?[{id:Date.now(),name:'お気に入り巡回',seconds:10,items:legacyFavs.map(x=>({...x,seconds:10,memo:''}))}]:[];
+let patterns=safeJSON(PATKEY);
+if(!Array.isArray(patterns)||patterns.length===0){
+  const rescuedPatterns=recoverLegacyPatterns();
+  patterns=rescuedPatterns.length?rescuedPatterns:
+    (legacyFavs.length?[{id:Date.now(),name:'復旧したお気に入り巡回',seconds:10,items:legacyFavs.map(x=>({...x,seconds:x.seconds||10,memo:x.memo||''}))}]:[]);
   localStorage.setItem(PATKEY,JSON.stringify(patterns));
 }
 let editPatternId=null,tourWin=null,tourTimer=null,tourIndex=0,tourRunning=false;
@@ -162,6 +199,21 @@ function stopTour(closeWin=true){tourRunning=false;if(tourTimer)clearTimeout(tou
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const secSel=document.querySelector('#tourSec');timeChoices().forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s+'秒';secSel.appendChild(o)})
 
+
+
+function manualRescue(){
+ const a=recoverLegacyAssets(), ps=recoverLegacyPatterns();
+ let added=0;
+ a.forEach(x=>{if(!saved.some(y=>y.code===x.code)){saved.push(x);added++}});
+ if(ps.length){
+   ps.forEach(p=>{
+     const sig=(p.name||'')+'|'+JSON.stringify(p.items||[]);
+     if(!patterns.some(q=>((q.name||'')+'|'+JSON.stringify(q.items||[]))===sig))patterns.push(p);
+   });
+ }
+ persist();savePatterns();
+ alert(`再検索完了：旧銘柄 ${a.length}件（新規復旧 ${added}件）／旧巡回パターン ${ps.length}件`);
+}
 
 function openData(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.querySelector('#dataView').classList.add('on')}
 function dataHome(){document.querySelector('#dataView').classList.remove('on');document.querySelector('#home').classList.add('on')}
