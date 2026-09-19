@@ -2,14 +2,16 @@
 <title>Stock Board</title><style>
 *{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{background:#fff;padding:calc(13px + env(safe-area-inset-top)) 15px 11px;border-bottom:1px solid #ddd}h1{margin:0;font-size:19px}.sub{font-size:12px;color:#777;margin-top:3px}main{max-width:720px;margin:auto;padding:14px}.view{display:none}.view.on{display:block}.hero{font-size:23px;font-weight:850;margin:8px 2px 14px}.cards{display:grid;gap:12px}.card{border:0;background:#fff;border-radius:19px;padding:20px 17px;text-align:left;box-shadow:0 2px 10px #0000000c}.card .ico{font-size:31px}.card b{display:block;font-size:20px;margin:7px 0 4px}.card span{font-size:12px;color:#777;line-height:1.5}.bar{display:flex;align-items:center;gap:8px;margin-bottom:13px}.back,.add{border:0;border-radius:11px;padding:10px 12px;font-weight:800}.back{background:#e7e7eb}.add{background:#111;color:#fff}.title{font-size:19px;font-weight:850;flex:1}.tabs{display:flex;overflow:auto;gap:7px;margin:0 -14px 14px;padding:0 14px 3px}.tab{white-space:nowrap;border:0;border-radius:99px;padding:9px 12px;background:#e7e7eb;font-weight:750}.tab.sel{background:#111;color:#fff}.list{display:grid;gap:9px}.item{display:block;width:100%;border:0;background:#fff;border-radius:15px;padding:15px;text-align:left}.item b{font-size:16px}.meta{font-size:11px;color:#777;margin-top:4px}.pill{float:right;background:#efefff;color:#5045cf;padding:5px 8px;border-radius:99px;font-size:10px;font-weight:800}.search{display:flex;gap:7px;margin-bottom:12px}.search input{margin:0;flex:1}.search button{border:0;border-radius:11px;background:#5a4df5;color:#fff;font-weight:800;padding:0 12px}dialog{border:0;border-radius:20px;width:min(92vw,460px);padding:18px}dialog::backdrop{background:#0008}label{font-size:12px;font-weight:800;color:#555}input{width:100%;padding:12px;border:1px solid #ccc;border-radius:11px;margin:5px 0 11px;font-size:16px}.btnrow{display:flex;gap:8px}.btn{flex:1;border:0;border-radius:11px;padding:12px;font-weight:800;background:#111;color:#fff}.ghost{background:#eee;color:#111}.ysearch{display:block;text-decoration:none;text-align:center;background:#efedff;color:#493fc4;padding:11px;border-radius:11px;font-weight:800;margin-bottom:10px}.hint{font-size:11px;color:#777;line-height:1.5}.manage{border-top:1px solid #eee;margin-top:13px;padding-top:10px}.mi{display:flex;gap:5px;align-items:center;padding:6px 0}.mi span{flex:1;font-size:12px}.mini{border:0;border-radius:7px;padding:6px}.danger{background:#fee;color:#a00}
 </style></head><body>
-<header><h1>📈 STOCK BOARD</h1><div class="sub">カテゴリー → 銘柄 → 見たい情報</div></header><main>
+<header><h1>📈 STOCK BOARD</h1><div class="sub">カテゴリー → 見たい情報 → 銘柄</div></header><main>
 <section id="home" class="view on"><div class="hero">まずカテゴリーを選ぶ</div><div class="cards">
 <button class="card" onclick="enter('fund')"><div class="ico">🌏</div><b>投資信託</b><span>オルカン・S&P500・FANG+など、登録した投信だけ表示</span></button>
 <button class="card" onclick="enter('stock')"><div class="ico">🏢</div><b>株式</b><span>三菱重工・フジクラ・銀行・半導体など、登録した株式だけ表示</span></button>
 <button class="card" onclick="enter('market')"><div class="ico">🌐</div><b>主要マーケット</b><span>日経平均・NYダウ・米ドル/円・TOPIX・NASDAQ・S&P 500</span></button>
 </div></section>
 <section id="cat" class="view"><div class="bar"><button class="back" onclick="home()">←</button><div id="catTitle" class="title"></div><button id="addBtn" class="add" onclick="addOpen()">＋追加</button></div>
-<div id="assetTabs" class="tabs"></div><div id="infoTabs" class="tabs"></div>
+<div style="font-size:12px;font-weight:800;color:#777;margin:2px 0 7px">① 見たい情報を選ぶ</div>
+<div id="infoTabs" class="tabs"></div>
+<div style="font-size:12px;font-weight:800;color:#777;margin:4px 0 7px">② 銘柄を選ぶ</div>
 <div class="search"><input id="filter" placeholder="このカテゴリー内を検索" oninput="renderAssets()"><button onclick="addOpen()">検索・追加</button></div>
 <div id="assets" class="list"></div></section>
 </main>
@@ -27,7 +29,7 @@ const markets=[
 {code:'998405.T',name:'TOPIX',type:'market'},
 {code:'^IXIC',name:'NASDAQ',type:'market'},
 {code:'^GSPC',name:'S&P 500',type:'market'}];
-let saved=JSON.parse(localStorage.getItem(KEY)||'null')||defaults, cat='fund', selected=null, info='detail';
+let saved=JSON.parse(localStorage.getItem(KEY)||'null')||defaults, cat='fund', info='detail';
 const titles={fund:'🌏 投資信託',stock:'🏢 株式',market:'🌐 主要マーケット'};
 const infoByType={
 fund:[['detail','詳細'],['forum','掲示板'],['chart','チャート'],['simulation','シミュレーション'],['sales','販売会社'],['history','時系列'],['dividend','分配金']],
@@ -36,22 +38,23 @@ market:[['detail','詳細'],['forum','掲示板'],['chart','チャート']]
 };
 function persist(){localStorage.setItem(KEY,JSON.stringify(saved))}
 function list(){return cat==='market'?markets:saved.filter(x=>x.type===cat)}
-function home(){cat=null;selected=null;document.querySelector('#cat').classList.remove('on');document.querySelector('#home').classList.add('on')}
-function enter(c){cat=c;selected=null;info='detail';document.querySelector('#home').classList.remove('on');document.querySelector('#cat').classList.add('on');document.querySelector('#catTitle').textContent=titles[c];document.querySelector('#addBtn').style.display=c==='market'?'none':'';document.querySelector('.search').style.display=c==='market'?'none':'flex';renderAssets()}
-function renderAssets(){const q=document.querySelector('#filter').value.toLowerCase();const xs=list().filter(x=>(x.name+' '+x.code).toLowerCase().includes(q));document.querySelector('#assetTabs').innerHTML=xs.map(x=>`<button class="tab ${selected===x.code?'sel':''}" onclick="selectAsset('${x.code.replace(/'/g,"\\'")}')">${x.name}</button>`).join(''); if(!selected&&xs[0])selected=xs[0].code; renderInfo(); renderCards(xs)}
-function renderCards(xs){document.querySelector('#assets').innerHTML=xs.map(x=>`<button class="item" onclick="selectAsset('${x.code.replace(/'/g,"\\'")}')"><span class="pill">${cat==='fund'?'投信':cat==='stock'?'株式':'指標・為替'}</span><b>${x.name}</b><div class="meta">${x.code}　タップして項目を選択</div></button>`).join('')}
-function selectAsset(code){selected=code;renderAssets()}
-function renderInfo(){document.querySelector('#infoTabs').innerHTML=infoByType[cat].map(([k,n])=>`<button class="tab ${info===k?'sel':''}" onclick="openInfo('${k}')">${n}</button>`).join('')}
+function home(){cat=null;document.querySelector('#cat').classList.remove('on');document.querySelector('#home').classList.add('on')}
+function enter(c){cat=c;info=infoByType[c][0][0];document.querySelector('#home').classList.remove('on');document.querySelector('#cat').classList.add('on');document.querySelector('#catTitle').textContent=titles[c];document.querySelector('#addBtn').style.display=c==='market'?'none':'';document.querySelector('.search').style.display=c==='market'?'none':'flex';renderInfo();renderAssets()}
+function renderAssets(){const q=document.querySelector('#filter').value.toLowerCase();const xs=list().filter(x=>(x.name+' '+x.code).toLowerCase().includes(q));renderCards(xs)}
+function renderCards(xs){document.querySelector('#assets').innerHTML=xs.map(x=>`<button class="item" onclick="openAsset('${x.code.replace(/'/g,"\\'")}')"><span class="pill">${cat==='fund'?'投信':cat==='stock'?'株式':'指標・為替'}</span><b>${x.name}</b><div class="meta">${x.code}　→ ${infoLabel()}を開く</div></button>`).join('')}
+function renderInfo(){document.querySelector('#infoTabs').innerHTML=infoByType[cat].map(([k,n])=>`<button class="tab ${info===k?'sel':''}" onclick="chooseInfo('${k}')">${n}</button>`).join('')}
+function infoLabel(){const x=infoByType[cat].find(([k])=>k===info);return x?x[1]:'詳細'}
+function chooseInfo(k){info=k;renderInfo();renderAssets()}
+function openAsset(code){window.open('https://finance.yahoo.co.jp/quote/'+encodeURIComponent(code)+suffix(info),'_blank','noopener')}
 function suffix(k){
  if(k==='detail')return '';
  const map={forum:'/forum',chart:'/chart',simulation:'/simulation',sales:'/sales',history:'/history',dividend:'/dividend',profile:'/profile',performance:'/performance',news:'/news'};
  return map[k]||'';
 }
-function openInfo(k){info=k;renderInfo();if(!selected)return;window.open('https://finance.yahoo.co.jp/quote/'+encodeURIComponent(selected)+suffix(k),'_blank','noopener')}
 function addOpen(){renderManage();dlg.showModal()}
 function renderManage(){document.querySelector('#manage').innerHTML=saved.filter(x=>x.type===cat).map(x=>`<div class="mi"><span>${x.name}<br><small>${x.code}</small></span><button class="mini danger" onclick="del('${x.code.replace(/'/g,"\\'")}')">削除</button></div>`).join('')}
-function del(code){saved=saved.filter(x=>x.code!==code);persist();selected=null;renderManage();renderAssets()}
-function saveNew(){let code=document.querySelector('#code').value.trim(),name=document.querySelector('#nm').value.trim();if(!code){alert('コードを入力してください');return}if(cat==='stock'&&/^\d{4}$/.test(code))code+='.T';if(!name)name=code;if(saved.some(x=>x.code.toUpperCase()===code.toUpperCase())){alert('登録済みです');return}saved.push({code,name,type:cat});persist();document.querySelector('#code').value='';document.querySelector('#nm').value='';dlg.close();selected=code;renderAssets()}
+function del(code){saved=saved.filter(x=>x.code!==code);persist();renderManage();renderAssets()}
+function saveNew(){let code=document.querySelector('#code').value.trim(),name=document.querySelector('#nm').value.trim();if(!code){alert('コードを入力してください');return}if(cat==='stock'&&/^\d{4}$/.test(code))code+='.T';if(!name)name=code;if(saved.some(x=>x.code.toUpperCase()===code.toUpperCase())){alert('登録済みです');return}saved.push({code,name,type:cat});persist();document.querySelector('#code').value='';document.querySelector('#nm').value='';dlg.close();renderAssets()}
 document.querySelector('#nm').addEventListener('input',e=>document.querySelector('#ys').href='https://finance.yahoo.co.jp/search/?query='+encodeURIComponent(e.target.value.trim()));
 persist();
 </script></body></html>
