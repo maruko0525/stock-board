@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f8fb"><title>Stock Board</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f5f7;color:#111}
+header{padding:calc(12px + env(safe-area-inset-top)) 14px 10px;background:#fff;border-bottom:1px solid #e5e5e5}
+h1{font-size:19px;margin:0}.sub{font-size:12px;color:#777;margin-top:3px}
+main{padding:14px;max-width:720px;margin:auto}.view{display:none}.view.active{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.mode{border:0;background:#fff;border-radius:18px;padding:22px 14px;text-align:left;box-shadow:0 2px 10px #0000000c}
+.mode .ico{font-size:30px}.mode b{display:block;font-size:18px;margin-top:9px}.mode span{display:block;color:#777;font-size:12px;margin-top:5px;line-height:1.4}
+.bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}.back{border:0;background:#e9e9ed;border-radius:11px;padding:9px 11px;font-weight:700}
+.title{font-weight:800;font-size:18px;flex:1}.add{border:0;background:#111;color:#fff;border-radius:11px;padding:10px 12px;font-weight:800}
+.search{display:flex;gap:8px;margin-bottom:12px}.search input{flex:1;margin:0}.search button{border:0;border-radius:12px;padding:0 13px;background:#5b4df7;color:#fff;font-weight:800}
+.list{display:grid;gap:10px}.item{border:0;width:100%;background:#fff;border-radius:16px;padding:15px;text-align:left;box-shadow:0 1px 5px #0000000d}
+.item b{font-size:17px}.meta{color:#777;font-size:12px;margin-top:4px}.pill{float:right;background:#f0efff;color:#5145d8;border-radius:99px;padding:5px 8px;font-size:11px;font-weight:700}
+.empty{text-align:center;color:#888;padding:45px 15px}.hint{font-size:12px;color:#777;line-height:1.55;margin:10px 2px}
+dialog{border:0;border-radius:20px;width:min(92vw,460px);padding:18px}dialog::backdrop{background:#0008}
+label{font-size:12px;font-weight:700;color:#555}input,select{width:100%;padding:12px;border:1px solid #ccc;border-radius:11px;margin:5px 0 12px;font-size:16px;background:#fff}
+.row{display:flex;gap:8px}.btn{flex:1;border:0;border-radius:11px;padding:12px;font-weight:800;background:#111;color:#fff}.ghost{background:#eee;color:#111}
+.yahoo{display:block;text-align:center;text-decoration:none;background:#f3f0ff;color:#4c40cc;border-radius:11px;padding:11px;font-weight:800;margin-bottom:12px}
+.manage{border-top:1px solid #eee;margin-top:15px;padding-top:12px}.manageItem{display:flex;align-items:center;gap:6px;padding:7px 0}.manageItem span{flex:1;font-size:13px}.mini{border:0;border-radius:8px;padding:7px}.danger{background:#fee;color:#a00}
+</style></head>
+<body>
+<header><h1>📈 STOCK BOARD</h1><div class="sub">見たい情報 → 銘柄 の順に選ぶ</div></header>
+<main>
+<section id="home" class="view active">
+  <div style="font-weight:800;font-size:22px;margin:6px 2px 2px">何を見る？</div>
+  <div class="grid">
+    <button class="mode" onclick="chooseMode('forum')"><div class="ico">💬</div><b>掲示板</b><span>投資家の投稿・みんなの評価</span></button>
+    <button class="mode" onclick="chooseMode('chart')"><div class="ico">📊</div><b>チャート</b><span>株価・指数・投信の値動き</span></button>
+    <button class="mode" onclick="chooseMode('detail')"><div class="ico">🧭</div><b>概況・詳細</b><span>価格、指標、基本情報など</span></button>
+    <button class="mode" onclick="chooseMode('news')"><div class="ico">📰</div><b>ニュース</b><span>銘柄に関連するニュース</span></button>
+  </div>
+</section>
+
+<section id="pick" class="view">
+  <div class="bar"><button class="back" onclick="goHome()">←</button><div class="title" id="modeTitle"></div><button class="add" onclick="openAdd()">＋追加</button></div>
+  <div class="search"><input id="filter" placeholder="登録済み銘柄を検索" oninput="renderList()"><button onclick="openAdd()">新規検索</button></div>
+  <div id="list" class="list"></div>
+  <div class="hint">日本株だけでなく、日経平均などの指数や投資信託も登録できます。選んだ情報ページをYahoo!ファイナンスで直接開きます。</div>
+</section>
+</main>
+
+<dialog id="dlg">
+<h3 style="margin-top:0">銘柄・指数・投信を追加</h3>
+<label>種類</label>
+<select id="kind"><option value="stock">日本株</option><option value="index">指数（日経平均など）</option><option value="fund">投資信託</option><option value="other">その他</option></select>
+<label>Yahoo!ファイナンスのコード</label>
+<input id="code" placeholder="例 7011 / 998407.O / 0331418A">
+<label>表示名</label>
+<input id="nm" placeholder="例 三菱重工 / 日経平均 / eMAXIS Slim...">
+<a id="ysearch" class="yahoo" href="https://finance.yahoo.co.jp/search/" target="_blank" rel="noopener">🔎 Yahoo!ファイナンスで名前から探す ↗</a>
+<div class="hint">名前しか分からない場合は上の検索を使い、Yahoo!ファイナンスに表示されるコードを入力してください。日本株の4桁コードは自動で「.T」を付けます。</div>
+<div class="row"><button class="btn ghost" onclick="dlg.close()">閉じる</button><button class="btn" onclick="addItem()">追加</button></div>
+<div class="manage"><b>登録済み</b><div id="manage"></div></div>
+</dialog>
+
+<script>
+const KEY='stockBoardV2';
+const OLD='stockBoardV1';
+const defaults=[
+ {code:'7011.T',name:'三菱重工',kind:'stock'},
+ {code:'5803.T',name:'フジクラ',kind:'stock'},
+ {code:'8306.T',name:'三菱UFJ',kind:'stock'},
+ {code:'6857.T',name:'アドバンテスト',kind:'stock'},
+ {code:'9984.T',name:'ソフトバンクG',kind:'stock'},
+ {code:'998407.O',name:'日経平均株価',kind:'index'}
+];
+let items=JSON.parse(localStorage.getItem(KEY)||'null');
+if(!items){
+ const old=JSON.parse(localStorage.getItem(OLD)||'null');
+ items=old?.length?old.map(x=>({code:/\.T$/i.test(x.code)?x.code:x.code+'.T',name:x.name,kind:'stock'})):defaults;
+}
+let mode='forum';
+const dlg=document.querySelector('#dlg');
+const modeNames={forum:'💬 掲示板',chart:'📊 チャート',detail:'🧭 概況・詳細',news:'📰 ニュース'};
+function persist(){localStorage.setItem(KEY,JSON.stringify(items))}
+function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function chooseMode(m){mode=m;document.querySelector('#home').classList.remove('active');document.querySelector('#pick').classList.add('active');document.querySelector('#modeTitle').textContent=modeNames[m];renderList()}
+function goHome(){document.querySelector('#pick').classList.remove('active');document.querySelector('#home').classList.add('active')}
+function target(x){
+ const base='https://finance.yahoo.co.jp/quote/'+encodeURIComponent(x.code);
+ if(mode==='forum')return base+'/forum';
+ if(mode==='chart')return base+'/chart';
+ if(mode==='news')return base+'/news';
+ return base;
+}
+function kindLabel(k){return ({stock:'日本株',index:'指数',fund:'投信',other:'その他'})[k]||'銘柄'}
+function renderList(){
+ const q=document.querySelector('#filter').value.trim().toLowerCase(), box=document.querySelector('#list');
+ const xs=items.filter(x=>(x.name+' '+x.code).toLowerCase().includes(q));
+ if(!xs.length){box.innerHTML='<div class="empty">該当する登録銘柄がありません。<br>「＋追加」から登録できます。</div>';return}
+ box.innerHTML=xs.map((x,i)=>`<button class="item" onclick="openItem('${esc(x.code)}')"><span class="pill">${kindLabel(x.kind)}</span><b>${esc(x.name)}</b><div class="meta">${esc(x.code)} ・ ${modeNames[mode]}を開く ↗</div></button>`).join('');
+}
+function openItem(code){const x=items.find(v=>v.code===code);if(x)window.open(target(x),'_blank','noopener')}
+function openAdd(){renderManage();dlg.showModal()}
+function renderManage(){
+ const b=document.querySelector('#manage');b.innerHTML=items.map((x,i)=>`<div class="manageItem"><span>${esc(x.name)} <small>${esc(x.code)}</small></span><button class="mini" onclick="move(${i},-1)">↑</button><button class="mini" onclick="move(${i},1)">↓</button><button class="mini danger" onclick="del(${i})">削除</button></div>`).join('')
+}
+function move(i,d){const j=i+d;if(j<0||j>=items.length)return;[items[i],items[j]]=[items[j],items[i]];persist();renderManage();renderList()}
+function del(i){items.splice(i,1);persist();renderManage();renderList()}
+function addItem(){
+ let code=document.querySelector('#code').value.trim(), name=document.querySelector('#nm').value.trim(), kind=document.querySelector('#kind').value;
+ if(!code){alert('コードを入力してください');return}
+ if(kind==='stock' && /^\d{4}$/.test(code))code+='.T';
+ if(!name)name=code;
+ if(items.some(x=>x.code.toUpperCase()===code.toUpperCase())){alert('すでに登録されています');return}
+ items.push({code,name,kind});persist();document.querySelector('#code').value='';document.querySelector('#nm').value='';dlg.close();renderList()
+}
+document.querySelector('#nm').addEventListener('input',e=>{
+ const q=e.target.value.trim();
+ document.querySelector('#ysearch').href='https://finance.yahoo.co.jp/search/?query='+encodeURIComponent(q);
+});
+persist();
+</script>
+</body></html>
