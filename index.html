@@ -44,7 +44,14 @@
   </div>
   <div id="tourList"></div>
 </div>
-</section><section id="dataView" class="view">
+</section>
+<section id="memoView" class="view" style="display:none">
+  <div class="topbar"><button class="back" onclick="goHome()">‹</button><b>📝 メモ一覧</b></div>
+  <div class="sub" style="padding:0 16px 10px">巡回中に残したメモを新しい順に表示します。</div>
+  <div id="memoList"></div>
+</section>
+
+<section id="dataView" class="view">
 <div class="bar"><button class="back" onclick="dataHome()">←</button><div class="title">💾 データ保存・復元</div></div>
 <div class="card"><b>旧バージョン救出</b>
 <p class="sub">Safariに残っている旧STOCK BOARDの保存領域を再検索します。</p>
@@ -208,7 +215,7 @@ function showReturnMemo(i){
  document.getElementById('returnMemo').style.display='block';
 }
 function hideReturnMemo(){document.getElementById('returnMemo').style.display='none'}
-function saveReturnMemo(){const p=currentPattern();if(!p)return;p.items[lastViewedIndex].memo=document.getElementById('returnMemoText').value;savePatterns()}
+function saveReturnMemo(){const p=currentPattern();if(!p)return;p.items[lastViewedIndex].memo=document.getElementById('returnMemoText').value;p.items[lastViewedIndex].memoUpdatedAt=new Date().toISOString();savePatterns()}
 function watchYahooClose(){
  if(closeWatcher)clearInterval(closeWatcher);
  closeWatcher=setInterval(()=>{if(tourRunning&&tourWin&&tourWin.closed){clearInterval(closeWatcher);closeWatcher=null;tourRunning=false;if(tourTimer)clearTimeout(tourTimer);showReturnMemo(lastViewedIndex)}},500);
@@ -264,6 +271,49 @@ function manualRescue(){
  alert(msg);
  showPatterns();
 }
+
+function memoEntries(){
+ const a=[];
+ patterns.forEach(p=>(p.items||[]).forEach((x,i)=>{
+   if((x.memo||'').trim())a.push({p,x,i,at:x.memoUpdatedAt||''});
+ }));
+ return a.sort((A,B)=>(B.at||'').localeCompare(A.at||''));
+}
+function fmtMemoDate(s){
+ if(!s)return '日時記録なし';
+ try{return new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(s))}
+ catch(e){return ''}
+}
+function openMemos(){
+ document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+ const v=document.getElementById('memoView');v.style.display='block';
+ renderMemos();
+}
+function renderMemos(){
+ const box=document.getElementById('memoList'),arr=memoEntries();
+ if(!arr.length){box.innerHTML='<div class="card"><b>まだメモはありません</b><p class="sub">巡回後に残したメモがここに集まります。</p></div>';return}
+ box.innerHTML=arr.map((m,n)=>`<div class="card">
+   <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(m.x.name)}｜${esc(m.x.infoName||m.x.info||'')}</b><span class="sub">${fmtMemoDate(m.at)}</span></div>
+   <div style="white-space:pre-wrap;margin:10px 0">${esc(m.x.memo)}</div>
+   <div class="touractions">
+    <button onclick="openMemoSource(${n})">↗ この情報を見る</button>
+    <button onclick="editMemoFromList(${n})">✏️ 編集</button>
+    <button class="danger" onclick="deleteMemoFromList(${n})">削除</button>
+   </div>
+   <div class="sub">巡回：${esc(m.p.name||'')}</div>
+ </div>`).join('');
+}
+function openMemoSource(n){const m=memoEntries()[n];if(m)window.open(favUrl(m.x),'stockBoardYahoo')}
+function editMemoFromList(n){
+ const m=memoEntries()[n];if(!m)return;
+ const v=prompt('メモを編集',m.x.memo||'');if(v===null)return;
+ m.x.memo=v;m.x.memoUpdatedAt=new Date().toISOString();savePatterns();renderMemos();
+}
+function deleteMemoFromList(n){
+ const m=memoEntries()[n];if(!m||!confirm('このメモを削除しますか？'))return;
+ m.x.memo='';m.x.memoUpdatedAt=new Date().toISOString();savePatterns();renderMemos();
+}
+
 function openData(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.querySelector('#dataView').classList.add('on')}
 function dataHome(){document.querySelector('#dataView').classList.remove('on');document.querySelector('#home').classList.add('on')}
 function backupObject(){return {app:'STOCK BOARD',formatVersion:1,exportedAt:new Date().toISOString(),assets:saved,patterns:patterns}}
