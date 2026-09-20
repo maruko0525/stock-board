@@ -35,11 +35,11 @@
 <div id="assets" class="list"></div></section>
 <section id="tour" class="view">
 <div class="bar"><button class="back" onclick="tourHome()">←</button><div class="title">⭐ 巡回パターン</div><button class="add" onclick="newPattern()">＋新規</button></div>
-<div id="patternList"></div>
+<div id="returnMemo" class="card" style="display:none;border:2px solid #111"><b id="returnMemoTitle">📝 今見た項目のメモ</b><textarea id="returnMemoText" class="memo" placeholder="今見た情報についてメモ"></textarea><div class="touractions"><button onclick="saveReturnMemo()">💾 保存</button><button onclick="resumeTour()">▶ 巡回再開</button><button onclick="hideReturnMemo()">閉じる</button></div></div><div id="patternList"></div>
 <div id="patternEdit" style="display:none">
   <div class="card">
     <input id="patternName" placeholder="巡回パターン名（例：朝チェック）" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;font-size:16px">
-    <div class="tourrow"><b>基本表示時間</b><select id="tourSec"></select><button class="add" onclick="applyBasicTime()">全項目に適用</button><button class="add" onclick="savePattern()">保存</button></div>
+    <div class="tourrow"><b>基本表示時間</b><select id="tourSec"></select><button class="add" onclick="savePattern()">保存</button></div>
     <div class="sub">「全項目に適用」で0.5秒〜60秒をまとめて変更できます。メモは各項目の「📝 メモを開く」から編集できます。巡回終了はYahoo側のタブを閉じるとSTOCK BOARDへ戻ります。</div>
   </div>
   <div id="tourList"></div>
@@ -187,7 +187,7 @@ function savePattern(){
 function deletePattern(id){if(!confirm('この巡回パターンを削除しますか？'))return;patterns=patterns.filter(p=>p.id!==id);savePatterns();showPatterns()}
 function renderTour(){
  const p=currentPattern();if(!p)return;
- document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><label class="mini">⏱ <select onchange="setItemSec(${i},this.value)">${secOptions(f.seconds||p.seconds||10)}</select></label><button class="danger" onclick="removeFav(${i})">削除</button></div><button class="mini" style="margin-top:8px" onclick="toggleMemo(${i})">📝 メモを開く</button>
+ document.querySelector('#tourList').innerHTML=p.items.length?p.items.map((f,i)=>`<div class="touritem"><b>${i+1}. ${esc(f.name)}｜${esc(f.infoName)}</b><div class="tourmeta">${f.type==='fund'?'投信':f.type==='stock'?'株式':'主要'}・${esc(f.code)}</div><div class="touractions"><button onclick="moveFav(${i},-1)">↑</button><button onclick="moveFav(${i},1)">↓</button><button class="danger" onclick="removeFav(${i})">削除</button></div><button class="mini" style="margin-top:8px" onclick="toggleMemo(${i})">📝 メモを開く</button>
 <textarea id="memo-${i}" class="memo" style="display:none" placeholder="この項目の巡回メモ" oninput="setMemo(${i},this.value)">${esc(f.memo||'')}</textarea></div>`).join(''):'<div class="card">このパターンにはまだ項目がありません。銘柄画面の ☆ から登録できます。</div>';
 }
 function timeChoices(){const a=[0.5,1,1.5];for(let n=2;n<=60;n++)a.push(n);return a}
@@ -198,17 +198,36 @@ function moveFav(i,d){const p=currentPattern(),j=i+d;if(j<0||j>=p.items.length)r
 function removeFav(i){const p=currentPattern();p.items.splice(i,1);savePatterns();renderTour()}
 function favUrl(f){return 'https://finance.yahoo.co.jp/quote/'+encodeURIComponent(f.code)+suffix(f.info)}
 function runPattern(id){editPatternId=id;startTour()}
-function startTour(){
- const p=currentPattern();if(!p||!p.items.length){alert('巡回項目がありません');return}
- stopTour(false);tourIndex=0;tourRunning=true;tourWin=window.open(favUrl(p.items[0]),'stockBoardYahoo');
- if(!tourWin){tourRunning=false;alert('Yahoo画面を開けませんでした');return}
- scheduleTour();
+
+let closeWatcher=null,lastViewedIndex=0;
+function showReturnMemo(i){
+ const p=currentPattern();if(!p||!p.items.length)return;
+ lastViewedIndex=Math.max(0,Math.min(i,p.items.length-1));const x=p.items[lastViewedIndex];
+ document.getElementById('returnMemoTitle').textContent='📝 '+x.name+'｜'+x.infoName;
+ document.getElementById('returnMemoText').value=x.memo||'';
+ document.getElementById('returnMemo').style.display='block';
 }
+function hideReturnMemo(){document.getElementById('returnMemo').style.display='none'}
+function saveReturnMemo(){const p=currentPattern();if(!p)return;p.items[lastViewedIndex].memo=document.getElementById('returnMemoText').value;savePatterns()}
+function watchYahooClose(){
+ if(closeWatcher)clearInterval(closeWatcher);
+ closeWatcher=setInterval(()=>{if(tourRunning&&tourWin&&tourWin.closed){clearInterval(closeWatcher);closeWatcher=null;tourRunning=false;if(tourTimer)clearTimeout(tourTimer);showReturnMemo(lastViewedIndex)}},500);
+}
+function resumeTour(){saveReturnMemo();hideReturnMemo();startTourAt(lastViewedIndex)}
+function startTourAt(idx){
+ const p=currentPattern();if(!p||!p.items.length)return;
+ stopTour(false);tourIndex=idx;lastViewedIndex=idx;tourRunning=true;
+ tourWin=window.open(favUrl(p.items[idx]),'stockBoardYahoo');
+ if(!tourWin){tourRunning=false;alert('Yahoo画面を開けませんでした');return}
+ watchYahooClose();scheduleTour();
+}
+
+function startTour(){const p=currentPattern();if(!p||!p.items.length){alert('巡回項目がありません');return}startTourAt(0)}
 function scheduleTour(){
  if(!tourRunning)return;const p=currentPattern(),item=p.items[tourIndex];
- const ms=Number(item.seconds||p.seconds||10)*1000;
+ const ms=Number(p.seconds||10)*1000;
  tourTimer=setTimeout(()=>{if(!tourRunning)return;if(!tourWin||tourWin.closed){stopTour(false);return}
- tourIndex=(tourIndex+1)%p.items.length;try{tourWin.location.href=favUrl(p.items[tourIndex])}catch(e){stopTour(false);return}scheduleTour()},ms);
+ tourIndex=(tourIndex+1)%p.items.length;lastViewedIndex=tourIndex;try{tourWin.location.href=favUrl(p.items[tourIndex])}catch(e){stopTour(false);return}scheduleTour()},ms);
 }
 function stopTour(closeWin=true){tourRunning=false;if(tourTimer)clearTimeout(tourTimer);tourTimer=null;if(closeWin&&tourWin&&!tourWin.closed)tourWin.close()}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
