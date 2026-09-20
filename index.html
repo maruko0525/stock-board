@@ -47,7 +47,7 @@
 </div>
 </section>
 <section id="memoView" class="view" style="display:none">
-  <div class="topbar"><button class="back" onclick="goHome()">‹</button><b>📝 メモ一覧</b></div>
+  <div class="topbar"><button class="back" onclick="memoToHome()">‹ ホーム</button><b>📝 メモ一覧</b></div>
   <div class="sub" style="padding:0 16px 10px">巡回中に残したメモを新しい順に表示します。</div>
   <div id="memoList"></div>
 </section>
@@ -285,6 +285,18 @@ function fmtMemoDate(s){
  try{return new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(s))}
  catch(e){return ''}
 }
+
+function memoToHome(){
+  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
+  const home=document.getElementById('homeView')||document.getElementById('home');
+  if(home){home.style.display='block';}
+  else{
+    const first=document.querySelector('section.view');
+    if(first)first.style.display='block';
+  }
+  window.scrollTo(0,0);
+}
+
 function openMemos(){
  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
  const v=document.getElementById('memoView');v.style.display='block';
