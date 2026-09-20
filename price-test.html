@@ -1,0 +1,37 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STOCK BOARD 株価取得テスト</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f7f8;margin:0;color:#111}.wrap{max-width:620px;margin:auto;padding:24px}.card{background:white;border-radius:24px;padding:24px;margin:16px 0;box-shadow:0 8px 28px #0000000c}h1{font-size:28px}.price{font-size:52px;font-weight:800}.chg{font-size:26px;font-weight:700}.plus{color:#e21}.minus{color:#1670e8}.muted{color:#777}button{width:100%;padding:17px;border:0;border-radius:16px;background:#111;color:#fff;font-size:18px;font-weight:700}.status{padding:12px;background:#eef2f4;border-radius:12px;margin-top:14px;white-space:pre-wrap}</style></head>
+<body><div class="wrap"><h1>📊 株価取得テスト</h1><div class="card"><b>三菱重工業 7011.T</b><div id="price" class="price">---</div><div id="chg" class="chg">---</div><div id="time" class="muted"></div></div>
+<button onclick="loadPrice()">🔄 実データを取得</button><div id="status" class="status">ボタンを押してテストします。</div>
+<p class="muted">テスト用です。Yahoo Financeの非公式Chartエンドポイントを、CORS中継サービス経由で読み取ります。取得できない場合はエラー内容を表示します。</p></div>
+<script>
+const target='https://query1.finance.yahoo.com/v8/finance/chart/7011.T?interval=1d&range=5d';
+const tries=[
+  {name:'AllOrigins',url:'https://api.allorigins.win/raw?url='+encodeURIComponent(target)},
+  {name:'CORSProxy',url:'https://corsproxy.io/?url='+encodeURIComponent(target)}
+];
+async function loadPrice(){
+ const s=document.getElementById('status');s.textContent='取得中…';
+ let errors=[];
+ for(const x of tries){
+  try{
+   s.textContent=x.name+' で取得中…';
+   const r=await fetch(x.url,{cache:'no-store'});
+   if(!r.ok)throw new Error('HTTP '+r.status);
+   const d=await r.json(), q=d.chart.result[0], m=q.meta;
+   const price=Number(m.regularMarketPrice);
+   const prev=Number(m.chartPreviousClose ?? m.previousClose);
+   if(!Number.isFinite(price)||!Number.isFinite(prev))throw new Error('価格データなし');
+   const diff=price-prev, pct=diff/prev*100;
+   document.getElementById('price').textContent=price.toLocaleString('ja-JP',{maximumFractionDigits:2});
+   const sign=diff>=0?'+':'';
+   const c=document.getElementById('chg');c.textContent=`${sign}${diff.toLocaleString('ja-JP',{maximumFractionDigits:2})}  ${sign}${pct.toFixed(2)}%`;
+   c.className='chg '+(diff>=0?'plus':'minus');
+   document.getElementById('time').textContent='取得時刻 '+new Date().toLocaleString('ja-JP');
+   s.textContent='✅ '+x.name+' 経由で取得成功';
+   return;
+  }catch(e){errors.push(x.name+': '+e.message)}
+ }
+ s.textContent='❌ 取得失敗\n'+errors.join('\n');
+}
+</script></body></html>
