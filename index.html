@@ -327,8 +327,8 @@ function deleteMemoFromList(n){
  m.x.memo='';m.x.memoUpdatedAt=new Date().toISOString();savePatterns();renderMemos();
 }
 
-function openData(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.querySelector('#dataView').classList.add('on')}
-function dataHome(){document.querySelector('#dataView').classList.remove('on');document.querySelector('#home').classList.add('on')}
+function openData(){document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='none'});const d=document.querySelector('#dataView');if(d){d.classList.add('on');d.style.display='block';window.scrollTo(0,0)}}
+function dataHome(){document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='none'});const x=document.querySelector('#home');if(x){x.classList.add('on');x.style.display='block'}window.scrollTo(0,0)}
 function backupObject(){return {app:'STOCK BOARD',formatVersion:1,exportedAt:new Date().toISOString(),assets:saved,patterns:patterns}}
 function downloadBackup(){
  const blob=new Blob([JSON.stringify(backupObject(),null,2)],{type:'application/json'}),a=document.createElement('a'),d=new Date(),pad=n=>String(n).padStart(2,'0');
