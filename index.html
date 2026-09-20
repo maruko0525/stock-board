@@ -46,7 +46,7 @@
   <div id="tourList"></div>
 </div>
 </section>
-<section id="memoView" class="view" style="display:none">
+<section id="memoView" class="view">
   <div class="topbar"><button class="back" onclick="memoToHome()">‹ ホーム</button><b>📝 メモ一覧</b></div>
   <div class="sub" style="padding:0 16px 10px">巡回中に残したメモを新しい順に表示します。</div>
   <div id="memoList"></div>
@@ -286,22 +286,9 @@ function fmtMemoDate(s){
  catch(e){return ''}
 }
 
-function memoToHome(){
-  document.querySelectorAll('.view').forEach(v=>v.style.display='none');
-  const home=document.getElementById('homeView')||document.getElementById('home');
-  if(home){home.style.display='block';}
-  else{
-    const first=document.querySelector('section.view');
-    if(first)first.style.display='block';
-  }
-  window.scrollTo(0,0);
-}
+function memoToHome(){showView('home')}
 
-function openMemos(){
- document.querySelectorAll('.view').forEach(v=>v.style.display='none');
- const v=document.getElementById('memoView');v.style.display='block';
- renderMemos();
-}
+function openMemos(){showView('memoView');renderMemos()}
 function renderMemos(){
  const box=document.getElementById('memoList'),arr=memoEntries();
  if(!arr.length){box.innerHTML='<div class="card"><b>まだメモはありません</b><p class="sub">巡回後に残したメモがここに集まります。</p></div>';return}
@@ -327,8 +314,19 @@ function deleteMemoFromList(n){
  m.x.memo='';m.x.memoUpdatedAt=new Date().toISOString();savePatterns();renderMemos();
 }
 
-function openData(){document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='none'});const d=document.querySelector('#dataView');if(d){d.classList.add('on');d.style.display='block';window.scrollTo(0,0)}}
-function dataHome(){document.querySelectorAll('.view').forEach(v=>{v.classList.remove('on');v.style.display='none'});const x=document.querySelector('#home');if(x){x.classList.add('on');x.style.display='block'}window.scrollTo(0,0)}
+
+function showView(id){
+ document.querySelectorAll('.view').forEach(v=>{
+   v.classList.remove('on');
+   v.style.removeProperty('display');
+ });
+ const target=document.getElementById(id);
+ if(target)target.classList.add('on');
+ window.scrollTo(0,0);
+}
+
+function openData(){showView('dataView')}
+function dataHome(){showView('home')}
 function backupObject(){return {app:'STOCK BOARD',formatVersion:1,exportedAt:new Date().toISOString(),assets:saved,patterns:patterns}}
 function downloadBackup(){
  const blob=new Blob([JSON.stringify(backupObject(),null,2)],{type:'application/json'}),a=document.createElement('a'),d=new Date(),pad=n=>String(n).padStart(2,'0');
