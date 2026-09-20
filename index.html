@@ -365,6 +365,7 @@ async function restoreBackup(){
 
 // ===== Ver.7.5 値動き一覧 =====
 const PRICE_API='https://stock-board-api.kjkt100.workers.dev/';
+const FUND_API='https://stock-board-fund-api.kjkt100.workers.dev/';
 let priceType='stock';
 let priceCache={};
 
@@ -423,7 +424,7 @@ async function loadPrices(){
   renderPriceRows();
   const syms=[...new Set(xs.map(apiSymbol))];
   try{
-    const u=PRICE_API+'?symbols='+encodeURIComponent(syms.join(','));
+    const u=(priceType==='fund'?FUND_API:PRICE_API)+'?symbols='+encodeURIComponent(syms.join(','));
     const res=await fetch(u,{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
