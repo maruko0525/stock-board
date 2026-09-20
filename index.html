@@ -19,10 +19,21 @@
 .patternBtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
 .patternBtns button,.mini{border:0;border-radius:9px;padding:8px 10px;font-weight:800}
 .memo{width:100%;min-height:64px;border:1px solid #ddd;border-radius:10px;padding:9px;margin-top:8px;font:inherit}
+
+.priceTop{display:flex;gap:8px;margin:8px 0 14px}
+.priceTop button{flex:1;border:0;border-radius:12px;padding:11px 8px;font-weight:850;background:#e7e7eb}
+.priceTop button.sel{background:#111;color:#fff}
+.priceRow{background:#fff;border-radius:15px;padding:14px 15px;margin:8px 0;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.priceName{font-weight:850;font-size:16px}.priceCode{font-size:11px;color:#777;margin-top:3px}
+.priceNum{text-align:right;font-variant-numeric:tabular-nums}.priceMain{font-size:19px;font-weight:900}
+.priceChange{font-size:13px;font-weight:850;margin-top:3px}
+.up{color:#d93025}.down{color:#1769ff}.flat{color:#666}
+.priceStatus{font-size:12px;color:#777;margin:8px 2px 12px;line-height:1.5}
+.refreshBtn{border:0;border-radius:11px;padding:10px 12px;background:#111;color:#fff;font-weight:850}
 </style></head><body>
 <header><h1>📈 STOCK BOARD</h1><div class="sub">カテゴリー → 見たい情報 → 銘柄</div></header><main>
 <section id="home" class="view on"><div class="hero">まずカテゴリーを選ぶ</div>
-<div class="favtop"><button class="favbtn" onclick="openTour()">⭐ お気に入り巡回</button></div><div class="favtop"><button class="favbtn" style="background:#e9e9ee;color:#111" onclick="openMemos()">📝 メモ一覧</button>
+<div class="favtop"><button class="favbtn" onclick="openTour()">⭐ お気に入り巡回</button></div><div class="favtop"><button class="favbtn" style="background:#1769ff" onclick="openPrices()">📊 値動き一覧</button></div><div class="favtop"><button class="favbtn" style="background:#e9e9ee;color:#111" onclick="openMemos()">📝 メモ一覧</button>
 <button class="favbtn" style="background:#e9e9ee;color:#111" onclick="openData()">💾 データ保存・復元</button></div><div class="cards">
 <button class="card" onclick="enter('fund')"><div class="ico">🌏</div><b>投資信託</b><span>オルカン・S&P500・FANG+など、登録した投信だけ表示</span></button>
 <button class="card" onclick="enter('stock')"><div class="ico">🏢</div><b>株式</b><span>三菱重工・フジクラ・銀行・半導体など、登録した株式だけ表示</span></button>
@@ -45,6 +56,17 @@
   </div>
   <div id="tourList"></div>
 </div>
+</section>
+
+<section id="priceView" class="view">
+  <div class="bar"><button class="back" onclick="showView('home')">←</button><div class="title">📊 値動き一覧</div><button class="refreshBtn" onclick="loadPrices()">更新</button></div>
+  <div class="priceTop">
+    <button id="pt-stock" onclick="setPriceType('stock')">株式</button>
+    <button id="pt-fund" onclick="setPriceType('fund')">投資信託</button>
+    <button id="pt-market" onclick="setPriceType('market')">主要マーケット</button>
+  </div>
+  <div id="priceStatus" class="priceStatus">取得準備中…</div>
+  <div id="priceList"></div>
 </section>
 <section id="memoView" class="view">
   <div class="topbar"><button class="back" onclick="memoToHome()">‹ ホーム</button><b>📝 メモ一覧</b></div>
@@ -338,6 +360,84 @@ async function restoreBackup(){
  if(!confirm('現在の登録内容をバックアップの内容に置き換えますか？'))return;
  saved=data.assets;patterns=data.patterns;persist();savePatterns();alert('復元しました');dataHome()}
  catch(e){alert('STOCK BOARDのバックアップファイルを読み込めませんでした')}
+}
+
+
+// ===== Ver.7.5 値動き一覧 =====
+const PRICE_API='https://stock-board-api.kjkt100.workers.dev/';
+let priceType='stock';
+let priceCache={};
+
+function openPrices(){
+  showView('priceView');
+  setPriceType(priceType||'stock');
+}
+function setPriceType(t){
+  priceType=t;
+  ['stock','fund','market'].forEach(k=>{
+    const b=document.getElementById('pt-'+k);
+    if(b)b.classList.toggle('sel',k===t);
+  });
+  renderPriceRows();
+  loadPrices();
+}
+function priceAssets(){
+  return priceType==='market' ? markets : saved.filter(x=>x.type===priceType);
+}
+function apiSymbol(x){
+  const map={
+    '998407.O':'^N225',
+    '998405.T':'998405.T',
+    'USDJPY=X':'USDJPY=X'
+  };
+  return map[x.code]||x.code;
+}
+function fmtPrice(n,code){
+  if(n==null || !Number.isFinite(Number(n)))return '—';
+  const v=Number(n);
+  if(code.includes('JPY=X'))return v.toLocaleString('ja-JP',{minimumFractionDigits:2,maximumFractionDigits:4});
+  return v.toLocaleString('ja-JP',{maximumFractionDigits:2});
+}
+function fmtSigned(n,digits=2){
+  const v=Number(n);
+  if(!Number.isFinite(v))return '—';
+  return (v>0?'+':'')+v.toLocaleString('ja-JP',{maximumFractionDigits:digits});
+}
+function renderPriceRows(){
+  const xs=priceAssets();
+  const box=document.getElementById('priceList');
+  if(!xs.length){box.innerHTML='<div class="card">登録がありません。</div>';return}
+  box.innerHTML=xs.map(x=>{
+    const s=apiSymbol(x),r=priceCache[s];
+    if(!r)return `<div class="priceRow"><div><div class="priceName">${esc(x.name)}</div><div class="priceCode">${esc(x.code)}</div></div><div class="priceNum"><div class="priceMain">—</div><div class="priceChange flat">取得中…</div></div></div>`;
+    if(r.ok===false)return `<div class="priceRow"><div><div class="priceName">${esc(x.name)}</div><div class="priceCode">${esc(x.code)}</div></div><div class="priceNum"><div class="priceMain">—</div><div class="priceChange flat">取得できません</div></div></div>`;
+    const c=Number(r.change),p=Number(r.percent),cls=c>0?'up':c<0?'down':'flat',arrow=c>0?'▲':c<0?'▼':'';
+    return `<div class="priceRow" onclick="window.open('https://finance.yahoo.co.jp/quote/${encodeURIComponent(x.code)}','_blank','noopener')"><div><div class="priceName">${esc(x.name)}</div><div class="priceCode">${esc(x.code)}</div></div><div class="priceNum"><div class="priceMain">${fmtPrice(r.price,x.code)}</div><div class="priceChange ${cls}">${arrow} ${fmtSigned(c)}　${fmtSigned(p)}%</div></div></div>`;
+  }).join('');
+}
+async function loadPrices(){
+  const xs=priceAssets();
+  const st=document.getElementById('priceStatus');
+  if(!xs.length){renderPriceRows();st.textContent='登録銘柄がありません。';return}
+  st.textContent='最新の値動きを取得中…';
+  renderPriceRows();
+  const syms=[...new Set(xs.map(apiSymbol))];
+  try{
+    const u=PRICE_API+'?symbols='+encodeURIComponent(syms.join(','));
+    const res=await fetch(u,{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    const arr=Array.isArray(data.results)?data.results:(data.symbol?[data]:[]);
+    arr.forEach(r=>{ if(r&&r.symbol)priceCache[r.symbol]=r; });
+    // Mark symbols not returned by API
+    syms.forEach(s=>{if(!priceCache[s])priceCache[s]={ok:false,symbol:s}});
+    renderPriceRows();
+    const ok=syms.filter(s=>priceCache[s]&&priceCache[s].ok!==false).length;
+    st.textContent=`${ok}/${syms.length}件取得　・　「更新」で再取得`;
+  }catch(e){
+    st.textContent='取得に失敗しました。通信状態を確認して「更新」を押してください。';
+    renderPriceRows();
+  }
 }
 
 persist();
